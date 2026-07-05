@@ -115,7 +115,7 @@ export default function Guestbook() {
         coupleChoice: newWish.coupleChoice,
         createdAt: new Date().toISOString(),
         likes: 0,
-        photoUrl: newWish.photoUrl.trim() || undefined
+        photoUrl: newWish.photoUrl.trim() || null
       };
 
       await submitGuestbookWishToFirebase(wish as any);
