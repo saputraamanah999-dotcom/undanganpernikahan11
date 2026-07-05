@@ -1,0 +1,105 @@
+// ============================================================
+// Firestore Security Rules — Undangan Pernikahan Bali
+// ------------------------------------------------------------
+// Project: undanganpernikahan-6d3b5 (default Firestore database)
+//
+// HOW TO DEPLOY:
+//   Option A (CLI):     firebase deploy --only firestore:rules
+//   Option B (Console): Firebase Console → Firestore → Rules tab
+//                       → paste this entire file → Publish
+// ============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper to check if a request is authenticated and has a whitelisted admin email
+    function isAdmin() {
+      return request.auth != null &&
+             request.auth.token != null &&
+             exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+    }
+
+    // ============================================================
+    // Admins collection
+    // ------------------------------------------------------------
+    // Read is restricted to AUTHENTICATED users only. This prevents
+    // anonymous scraping of admin email addresses. The client only
+    // reads a single admin doc by ID AFTER the user has signed in
+    // with Google, so request.auth is always populated by then.
+    // Write is admin-only (an existing admin must promote new admins).
+    // ============================================================
+    match /admins/{email} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // Couples collection (public read, admin write)
+    match /couples/{document} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // siteSettings collection (theme, music, dates, backgrounds, etc.)
+    match /siteSettings/{document} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Gallery collection (public read, admin write)
+    match /gallery/{document} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Announcements / Notifications (public read, admin write)
+    match /announcements/{document} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // RSVP submissions (public read + create, admin edit/delete)
+    match /rsvp/{document} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // Guestbook / Wishes (public read + create, admin edit/delete)
+    match /guestbook/{document} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // Viewed-by tracking for announcements (public read/write so any
+    // guest can mark an announcement as seen without auth)
+    match /viewedByTracking/{document} {
+      allow read, write: if true;
+    }
+
+    // ============================================================
+    // Live guest presence (heartbeats) — public read/write so the
+    // live counter works for all guests without admin auth.
+    // Each guest heartbeat doc is keyed by a per-session guestId and
+    // contains only { id, lastSeen, name, couple, userAgent }.
+    // ============================================================
+    match /presence/{guestId} {
+      allow read: if true;             // any guest can see how many are online
+      allow create, update: if true;   // guests heartbeat themselves
+      allow delete: if true;           // guests clean up on unload (best-effort)
+    }
+
+    // ============================================================
+    // Meta collection — internal flags like "seeded" boolean.
+    // Public read so any client can check seeding state without auth;
+    // public create so first-run seeding works even before any admin
+    // has logged in. Updates/deletes remain admin-only to prevent
+    // tampering.
+    // ============================================================
+    match /meta/{document} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+  }
+}
