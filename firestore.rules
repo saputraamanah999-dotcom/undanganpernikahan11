@@ -1,0 +1,85 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper to check if a request is authenticated and has a whitelisted admin email
+    function isAdmin() {
+      return request.auth != null && 
+             request.auth.token != null && 
+             exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+    }
+
+    // Admins collection rules
+    match /admins/{email} {
+      allow read: if true; // Allow reading to verify admin status
+      allow write: if isAdmin();
+    }
+
+    // Couples collection
+    match /couples/{document} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // siteSettings collection (contains theme, general settings, etc.)
+    match /siteSettings/{document} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Gallery collection
+    match /gallery/{document} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Announcements/Notifications collection
+    match /announcements/{document} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // RSVP submissions
+    match /rsvp/{document} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // Guestbook/Wishes collection
+    match /guestbook/{document} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // Viewed-by tracking for announcements
+    match /viewedByTracking/{document} {
+      allow read, write: if true;
+    }
+
+    // ============================================================
+    // Live guest presence (heartbeats) — public read/write so the
+    // live counter works for all guests without admin auth.
+    // Each guest heartbeat doc is keyed by a per-session guestId and
+    // contains only { id, lastSeen, name, couple, userAgent }.
+    // ============================================================
+    match /presence/{guestId} {
+      allow read: if true;     // any guest can see how many are online
+      allow create, update: if true;  // guests heartbeat themselves
+      allow delete: if true;   // guests clean up on unload (best-effort)
+    }
+
+    // ============================================================
+    // Meta collection — internal flags like "seeded" boolean.
+    // Public read so any client can check seeding state without auth;
+    // public create so first-run seeding works even before any admin
+    // has logged in. Updates/deletes remain admin-only to prevent
+    // tampering.
+    // ============================================================
+    match /meta/{document} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+  }
+}
